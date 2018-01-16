@@ -170,7 +170,7 @@ if (args.address or len(args.solidity_file) or args.init_db):
             logging.info("Using local IPC.")
         else:
             eth = EthJsonRpc(rpchost, rpcport, rpctls)
-            logging.info("Using RPC: Host=" + rpchost + ", port=" + str(rpcport), "tls=" + str(rpctls))
+            logging.info("Using RPC: Host=" + rpchost + ", port=" + str(rpcport) + ", tls=" + str(rpctls))
 
 
 # Database search ops
@@ -206,10 +206,10 @@ elif (args.address):
     try:
         code = eth.eth_getCode(args.address)
 
-        if (code == "0x"):
-            exitWithError("Received an empty response from eth_getCode. Check the contract address and verify that you are on the correct chain.") 
+        if (code == "0x" or code == "0x0"):
+            exitWithError("Received an empty response from eth_getCode. Check the contract address and verify that the RPC parameters in " + mythril_dir + "/settings.yaml") 
     except ConnectionError:
-        exitWithError("Error connecting to Ethereum node. Make sure that your node is up and that the provided RPC/IPC parameters are correct.")
+        exitWithError("Error connecting to Ethereum node (" + rpchost + "). Make sure that your node is up and verify that the RPC parameters in: " + mythril_dir + "/settings.yaml")
 
     contracts.append(ETHContract(code, name=args.address, address = args.address))
 elif (len(args.solidity_file)):
