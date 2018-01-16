@@ -26,6 +26,7 @@ import sys
 import argparse
 import os
 import re
+import yaml
 
 
 def searchCallback(code_hash, code, addresses, balances):
@@ -63,19 +64,12 @@ inputs.add_argument('--data', help='message call input data for tracing')
 
 options = parser.add_argument_group('options')
 options.add_argument('--sync-all', action='store_true', help='Also sync contracts with zero balance')
-options.add_argument('--infura-mainnet', action='store_true', help='Use Infura Node service, equivalent to: --rpchost=mainnet.infura.io --rpcport=443 --rpctls="True"')
-options.add_argument('--infura-rinkeby', action='store_true', help='Use Infura Node service, equivalent to: --rpchost=rinkeby.infura.io --rpcport=443 --rpctls="True"')
-options.add_argument('--infura-kovan', action='store_true', help='Use Infura Node service, equivalent to: --rpchost=kovan.infura.io --rpcport=443 --rpctls="True"')
-options.add_argument('--infura-ropsten', action='store_true', help='Use Infura Node service, equivalent to: --rpchost=ropsten.infura.io --rpcport=443 --rpctls="True"')
-options.add_argument('--rpchost', default='127.0.0.1', help='RPC host')
-options.add_argument('--rpcport', type=int, default=8545, help='RPC port')
-options.add_argument('--rpctls', type=bool, default=False, help='RPC port')
 options.add_argument('--ipc', help='use IPC interface instead of RPC', action='store_true')
 options.add_argument('--max-depth', type=int, default=12, help='Maximum recursion depth for symbolic execution')
 options.add_argument('--enable-physics', type=bool, default=False, help='enable graph physics simulation')
 options.add_argument('-v', type=int, help='log level (0-2)', metavar='LOG_LEVEL')
 
-# Get config values
+# Get environment variables
 
 try:
     mythril_dir = os.environ['MYTHRIL_DIR']
@@ -88,7 +82,7 @@ except KeyError:
     solc_binary = 'solc'
 
 
-# Initialize data directry and singature database
+# Initialize data directry and signature database
 
 if not os.path.exists(mythril_dir):
     logging.info("Creating mythril data directory")
@@ -117,6 +111,40 @@ else:
         except JSONDecodeError as e:
             exitWithError("Invalid JSON in signatures file " + signatures_file + "\n" + str(e))
 
+
+# If no config file exists, RPC is set up to use INFURA mainnet
+
+rpchost = 'mainnet.infura.io'
+rpcport = 443
+rpctls = True
+
+# Try to override the defaults with the values in settings.yaml
+# If a rpchost is set, port defaults to 8545 and tls defaults to False.
+
+config_file = os.path.join(mythril_dir, 'settings.yaml')
+
+if os.path.exists(config_file):
+    with open(config_file) as f:
+        settings = yaml.load(f)
+
+    try:
+        rpchost = settings['RPC']['host']
+        rpcport = 8545
+        rpctls = False
+    except KeyError:
+        pass
+
+    try:
+        rpctls = settings['RPC']['tls']
+    except KeyError:
+        pass
+
+    try:
+        rpcport = settings['RPC']['port']
+    except KeyError:
+        pass
+
+
 # Parse cmdline args
 
 args = parser.parse_args()
@@ -133,22 +161,16 @@ elif (args.hash):
     print("0x" + utils.sha3(args.hash)[:4].hex())
     sys.exit()
 
+
 # Establish RPC/IPC connection if necessary
 
 if (args.address or len(args.solidity_file) or args.init_db):
         if args.ipc:
             eth = EthIpc()
+            logging.info("Using local IPC.")
         else:
-            if args.infura_mainnet:
-                eth = EthJsonRpc('mainnet.infura.io', 443, True)
-            elif args.infura_rinkeby:
-                eth = EthJsonRpc('rinkeby.infura.io', 443, True)
-            elif args.infura_kovan:
-                eth = EthJsonRpc('kovan.infura.io', 443, True)
-            elif args.infura_ropsten:
-                eth = EthJsonRpc('ropsten.infura.io', 443, True)
-            else:
-                eth = EthJsonRpc(args.rpchost, args.rpcport, args.rpctls)
+            eth = EthJsonRpc(rpchost, rpcport, rpctls)
+            logging.info("Using RPC: Host=" + rpchost + ", port=" + rpcport, "tls=" + rpctls)
 
 
 # Database search ops
