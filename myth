@@ -170,7 +170,7 @@ if (args.address or len(args.solidity_file) or args.init_db):
             logging.info("Using local IPC.")
         else:
             eth = EthJsonRpc(rpchost, rpcport, rpctls)
-            logging.info("Using RPC: Host=" + rpchost + ", port=" + rpcport, "tls=" + rpctls)
+            logging.info("Using RPC: Host=" + rpchost + ", port=" + str(rpcport), "tls=" + str(rpctls))
 
 
 # Database search ops
